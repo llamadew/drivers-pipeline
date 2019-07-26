@@ -1,6 +1,7 @@
-# drivers-pipeline
-This repo contains an ETL script that executes postprocessing for of the raw client metadata telemetry into an analytical dataset.
-The resulting dataset resides in an MDB collection. 
+# drivers-pipeline (WIP)
+This repo contains an ETL script that executes postprocessing for of the raw client metadata telemetry into an analytical dataset. For more information refer to this [Design Doc](https://docs.google.com/document/d/1LUpcHjOvAT3jSUSKkzE5esfIqgEYQQ6beY3x-kGHv7E/edit?usp=sharing).
+
+The resulting dataset resides in an MDB collection. Please contact Natalya Furmanova for access. 
 
 ## How does the ETL process data? 
 The ETL aggregates client connections count daily by `group ID`, `driver`,`driver version`, `platform`, `OS`, `OSarchitecture`, `MDB server version`. 
@@ -24,3 +25,9 @@ It further parses the platform field for drivers that provide additional informa
 | lver | Driver Language Version | String or Object (nullable) | "10.12.0" |
 | fr | Framework | String (nullable) | "mongoid-5.2.1" |
 
+## Why is it WIP? What still needs done?
+Although the script works, it is more of a prototype than complete solution. Notable next steps: 
+* enable running of the script on TechOps K8S platform (Kanopy)
+* adjust structure of subdocuments based on feedback (an iterative process)
+* modularize/refactor code to be more robust
+* once the original raw dataset is in data lake, modify the script to query data lake instead of MDB
