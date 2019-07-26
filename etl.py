@@ -18,9 +18,9 @@ logging.basicConfig(filename='drivers_metrics.log',level=logging.INFO)
 
 #root_dir = os.path.abspath(os.path.join(__file__, '../..'))
 
-logging.info("test")
-
 # todo define Keys, driver names, etc.
+
+MAX_DELTA = 2
 
 def today_midnight():
     today = datetime.today()
@@ -39,6 +39,30 @@ def start_and_end_date(end_date_string=None,delta=7):
     end_date = get_date(end_date_string) if end_date_string else today_midnight()
     start_date = end_date -timedelta(delta)
     return (start_date,end_date)
+
+
+def default_start_end_date(collection):
+    pipeline = [
+        {
+            '$group': {
+                '_id': None,
+                'max': {
+                    '$max': '$ts'
+                }
+            }
+        }, {
+            '$project': {
+                'max': 1,
+                '_id': 0
+            }
+        }
+    ]
+    last_date =  run_aggregation(collection,pipeline)[0]['max']
+    last_date_midnight = datetime(last_date.year,last_date.month,last_date.day, tzinfo=timezone.utc)
+    print('max found date midnight: %s' % last_date_midnight)
+    start_date = last_date_midnight+timedelta(1)
+    end_date = today_midnight()
+    return  (start_date,end_date)
 
 def driver_names():
     return [
@@ -67,9 +91,6 @@ def driver_names():
 def driver_name_condition():
     return list(map(lambda x: {'entries.raw.driver.name': x}, driver_names()))
 
-def pipeline_get_min_date():
-    #TODO implement pipeline.
-    pass
 
 def pipeline_drivers(start_date,end_date):
     pipeline = [
@@ -215,6 +236,7 @@ def language_version_and_framework(doc):
 
         except Exception as e:
             logging.error("Exception %s for doc with platform string %s",e,platform_name)
+            print("error detected")
     else:
         logging.info("Document with driver name %s did not have platform field",driver_name)
     return doc
@@ -230,13 +252,7 @@ def postprocessing_connection_string(username,password):
     return "mongodb+srv://{}:{}@cluster0-ee68b.mongodb.net/test".format(username,password)
 
 
-def etl(dw_prod_username,dw_prod_pw,postprocessing_username,postprocessing_pw,start_date,end_date):
-    prod = pymongo.MongoClient(prod_connection_string(dw_prod_username,dw_prod_pw))
-    dw_raw = prod.dw_raw
-    raw_metadata = prod.dw_raw['cloud__cloud_backend__rawclientmetadata']
-    my_cluster = pymongo.MongoClient(postprocessing_connection_string(postprocessing_username,postprocessing_pw))
-    db = my_cluster.transactions_metrics
-    drivers_test = db['drivers_test_new']
+def etl(start_date,end_date):
     #pdb.set_trace()
     #extract
     print(pipeline_drivers(start_date,end_date))
@@ -259,8 +275,9 @@ def etl(dw_prod_username,dw_prod_pw,postprocessing_username,postprocessing_pw,st
     end_time = datetime.today()
     time_elapsed = end_time - start_time
     print("parsing took {}".format(time_elapsed))
-def full_etl(start_delta,end_date):
 
+
+def full_etl(start_delta,end_date):
     return None
 
 def get_secrets():
@@ -268,6 +285,22 @@ def get_secrets():
     secrets = yaml.load(stream)
     username_dw_prod, pw_dw_prod, u_postprocessing, pw_postprocessing = (secrets['u_dw_prod'],secrets['pw_dw_prod'],secrets['u_postprocessing'],secrets['pw_postprocessing'])
     return (username_dw_prod, pw_dw_prod, u_postprocessing, pw_postprocessing)
+
+def etl_for_range_of_dates(start_date,end_date):
+    #start_date = get_date(start_date)
+    #end_date = get_date(end_date)
+    while (end_date - timedelta(MAX_DELTA)) > start_date:
+        interim_start_date = end_date - timedelta(MAX_DELTA)
+        print("running etl for start_date: %s, end_date: %s" % (interim_start_date,end_date))
+        etl(interim_start_date,end_date)
+        end_date = interim_start_date
+    if (end_date > start_date):
+        print("running etl for start_date: %s, end_date: %s" % (start_date,end_date))
+        etl(start_date,end_date)
+    print('finished etl')
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -278,7 +311,21 @@ if __name__ == "__main__":
     parser.add_argument('-pw_postprocessing', default = pw_postprocessing)
     parser.add_argument('-start_delta', default = 7, type=int)
     parser.add_argument('-end_date')
+    parser.add_argument('-from_last_until_yesterday', type = bool, default = True)
     options = parser.parse_args()
-    pdb.set_trace()
-    start_date,end_date = start_and_end_date(options.end_date,options.start_delta)
-    etl(options.username_dw_prod,options.pw_dw_prod,options.u_postprocessing,options.pw_postprocessing,start_date,end_date)
+    #pdb.set_trace()
+    print('connecting..')
+    prod = pymongo.MongoClient(prod_connection_string(options.username_dw_prod,options.pw_dw_prod))
+    dw_raw = prod.dw_raw
+    raw_metadata = prod.dw_raw['cloud__cloud_backend__rawclientmetadata']
+    my_cluster = pymongo.MongoClient(postprocessing_connection_string(options.u_postprocessing,options.pw_postprocessing))
+    db = my_cluster.transactions_metrics
+    drivers_test = db['drivers_test_new']
+    print('deriving dates...')
+    if (options.from_last_until_yesterday is True):
+        start_date,end_date = default_start_end_date(drivers_test)
+    else:
+        start_date,end_date = start_and_end_date(options.end_date,options.start_delta)
+    print('start date %s , end date %s' % (start_date,end_date))
+    print('starting ETL..')
+    etl_for_range_of_dates(start_date,end_date)
