@@ -310,8 +310,11 @@ if __name__ == "__main__":
     parser.add_argument('-u_postprocessing', default= u_postprocessing)
     parser.add_argument('-pw_postprocessing', default = pw_postprocessing)
     parser.add_argument('-start_delta', default = 7, type=int)
-    parser.add_argument('-end_date')
-    parser.add_argument('-from_last_until_yesterday', type = bool, default = True)
+    parser.add_argument('-end_date') # format '%Y%m%d'
+    parser.add_argument('-from_last_until_yesterday', type = bool) #default = True)
+    parser.add_argument('--default_dates', dest='since_last', action='store_true')
+    parser.add_argument('--no-default_dates', dest='since_last', action='store_false')
+    parser.set_defaults(since_last=True)
     options = parser.parse_args()
     #pdb.set_trace()
     print('connecting..')
@@ -322,7 +325,7 @@ if __name__ == "__main__":
     db = my_cluster.transactions_metrics
     drivers_test = db['drivers_test_new']
     print('deriving dates...')
-    if (options.from_last_until_yesterday is True):
+    if (options.since_last is True):
         start_date,end_date = default_start_end_date(drivers_test)
     else:
         start_date,end_date = start_and_end_date(options.end_date,options.start_delta)
