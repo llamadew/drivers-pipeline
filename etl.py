@@ -35,9 +35,10 @@ def get_date(date_string):
 def end_date(days=0):
     return today_midnight() - timedelta(days)
 
-def start_and_end_date(end_date_string=None,delta=7):
-    end_date = get_date(end_date_string) if end_date_string else today_midnight()
-    start_date = end_date -timedelta(delta)
+def start_and_end_date(end_date_string=None,start_date_string=None):
+    end_date = get_date(end_date_string)
+    #start_date = end_date -timedelta(delta)
+    start_date = get_date(start_date_string)
     return (start_date,end_date)
 
 
@@ -311,7 +312,7 @@ if __name__ == "__main__":
     parser.add_argument('-pw_postprocessing', default = pw_postprocessing)
     parser.add_argument('-start_delta', default = 7, type=int)
     parser.add_argument('-end_date') # format '%Y%m%d'
-    parser.add_argument('-from_last_until_yesterday', type = bool) #default = True)
+    parser.add_argument('-start_date')
     parser.add_argument('--default_dates', dest='since_last', action='store_true')
     parser.add_argument('--no-default_dates', dest='since_last', action='store_false')
     parser.set_defaults(since_last=True)
@@ -328,7 +329,7 @@ if __name__ == "__main__":
     if (options.since_last is True):
         start_date,end_date = default_start_end_date(drivers_test)
     else:
-        start_date,end_date = start_and_end_date(options.end_date,options.start_delta)
+        start_date,end_date = start_and_end_date(options.end_date,options.start_date)
     print('start date %s , end date %s' % (start_date,end_date))
     print('starting ETL..')
     etl_for_range_of_dates(start_date,end_date)
